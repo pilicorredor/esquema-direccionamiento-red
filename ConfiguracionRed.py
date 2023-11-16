@@ -73,8 +73,6 @@ def mostrar_configuraciones(subredes, mascara):
     ventana_configuraciones.mainloop()
 
 def guardar_configuracion():
-    configuracion.subredes = int(subredes_entry.get())
-    configuracion.dispositivos_por_segmento = int(dispositivos_por_segmento_entry.get())
     configuracion.dispositivos_intermediacion = int(dispositivos_intermediacion_entry.get())
     configuracion.hosts_por_red = int(hosts_por_red_entry.get())
     configuracion.uso_dispositivos_personales = uso_dispositivos_personales_var.get()
@@ -102,12 +100,6 @@ ventana.title("Configuración de Red")
 configuracion = ConfiguracionRed()
 
 
-subredes_label = ttk.Label(ventana, text="¿Cuántas subredes o segmentos que va a tener su red?: ")
-subredes_entry = ttk.Entry(ventana)
-
-dispositivos_por_segmento_label = ttk.Label(ventana, text="Cuántos dispositivos tendrá cada segmento de su red?: ")
-dispositivos_por_segmento_entry = ttk.Entry(ventana)
-
 dispositivos_intermediacion_label = ttk.Label(ventana, text="¿Cuántos dispositivos de intermediación utilizará?: ")
 dispositivos_intermediacion_entry = ttk.Entry(ventana)
 
@@ -127,13 +119,6 @@ subred_por_sede_checkbox = ttk.Checkbutton(ventana, variable=subred_por_sede_var
 
 crecimiento_red_label = ttk.Label(ventana, text="¿En un lapso de 5 años, cuál es el porcentaje de crecimiento para la red? (%):")
 crecimiento_red_entry = ttk.Entry(ventana)
-
-
-subredes_label.grid(row=0, column=0, padx=10, pady=5, sticky="E")
-subredes_entry.grid(row=0, column=1, padx=10, pady=5)
-
-dispositivos_por_segmento_label.grid(row=1, column=0, padx=10, pady=5, sticky="E")
-dispositivos_por_segmento_entry.grid(row=1, column=1, padx=10, pady=5)
 
 dispositivos_intermediacion_label.grid(row=2, column=0, padx=10, pady=5, sticky="E")
 dispositivos_intermediacion_entry.grid(row=2, column=1, padx=10, pady=5)
