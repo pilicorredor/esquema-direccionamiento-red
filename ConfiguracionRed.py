@@ -19,7 +19,7 @@ def calcular_direccionamiento(configuracion):
     
     subredes = []
 
-    hosts_totales = int(configuracion.hosts_por_red + (configuracion.hosts_por_red * (configuracion.crecimiento_red / 100)))
+    hosts_totales = int(configuracion.hosts_por_red + (configuracion.hosts_por_red * (configuracion.crecimiento_red / 100))+configuracion.dispositivos_intermediacion)
     print(f'hosts: {hosts_totales}')
 
     prefix_length = 32 - (hosts_totales - 2).bit_length() 
