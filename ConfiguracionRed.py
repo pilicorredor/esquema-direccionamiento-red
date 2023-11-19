@@ -1,146 +1,190 @@
 import tkinter as tk
-from tkinter import ttk, scrolledtext
-import networkx as nx
+from tkinter import ttk, simpledialog, messagebox
+from ipaddress import IPv4Network
+import random
+import math
 import matplotlib.pyplot as plt
-from ipaddress import IPv4Network, IPv4Address
+from matplotlib.patches import Circle
 
 class ConfiguracionRed:
     def __init__(self):
-        self.subredes = 0
-        self.dispositivos_por_segmento = 0
-        self.dispositivos_intermediacion = 0
-        self.hosts_por_red = 0
-        self.uso_dispositivos_personales = False
         self.numero_sedes = 0
         self.subred_por_sede = False
-        self.crecimiento_red = 0
+        self.configuraciones_sedes = []
+        self.ipclasea = "10.4.1.0"
+        self.ipclaseb = "144.168.1.0"
+        self.ipclaseac = "192.168.1.0"
 
-def calcular_direccionamiento(configuracion):
-    
-    subredes = []
+    def calcular_mascara_red(self, total_hosts):
+        bits_necesarios = 0
+        while 2 ** bits_necesarios - 2 < total_hosts:
+            bits_necesarios += 1
 
-    hosts_totales = int(configuracion.hosts_por_red + (configuracion.hosts_por_red * (configuracion.crecimiento_red / 100))+configuracion.dispositivos_intermediacion)
-    print(f'hosts: {hosts_totales}')
+        # Calcular la máscara de subred
+        mascara_subred = 32 - bits_necesarios
+        mascara = IPv4Network(f"0.0.0.0/{mascara_subred}", strict=False)
+        return mascara
 
-    prefix_length = 32 - (hosts_totales - 2).bit_length() 
-    mascara = IPv4Network(f"0.0.0.0/{prefix_length}", strict=False)
+    def preguntar_empleados(self, sede, indice):
+        if sede.uso_dispositivos_personales:
+            sede.cantidad_empleados = simpledialog.askinteger(f"Sede {indice + 1}", f"Ingrese la cantidad de empleados en {sede.nombre_sede}:")
 
-    # Calcular la dirección de red inicial
-    network_address = IPv4Address("132.255.0.0")  
-    network = IPv4Network(f"{network_address}/{mascara.prefixlen}", strict=False)
+        sede.cantidad_dispositivos_intermediacion = simpledialog.askinteger(f"Sede {indice + 1}", f"Cantidad de dispositivos Gestionables de intermediación en {sede.nombre_sede}:")
+        sede.crecimiento_5_anios = simpledialog.askfloat(f"Sede {indice + 1}", f"Crecimiento a 5 años en {sede.nombre_sede} (%):")
 
-    for subred in network.subnets(new_prefix=mascara.prefixlen):
-        subredes.append(subred)
+    def calcular_hosts_totales(self, sede):
+        if sede.uso_dispositivos_personales:
+            return sede.cantidad_hosts + (sede.cantidad_hosts * sede.crecimiento_5_anios / 100) + sede.cantidad_dispositivos_intermediacion + sede.cantidad_empleados
+        else:
+            return sede.cantidad_hosts + (sede.cantidad_hosts * sede.crecimiento_5_anios / 100) + sede.cantidad_dispositivos_intermediacion
 
-    return subredes, mascara  
+    def generar_subred_aleatoria(self, clase):
+        if clase == 'A':
+            ip_base = self.ipclasea
+        elif clase == 'B':
+            ip_base = self.ipclaseb
+        elif clase == 'C':
+            ip_base = self.ipclaseac
+        else:
+            # Tratar otro caso si es necesario
+            return None
 
-def generar_grafico(subredes):
-    G = nx.Graph()
-    labels = {}
+        # Convertir la IP base a una lista de números
+        ip_lista = list(map(int, ip_base.split('.')))
 
-    for i, subred in enumerate(subredes):
-        G.add_node(f"Subred {i + 1}")
-        labels[f"Subred {i + 1}"] = str(subred.network_address)
+        # Generar una subred aleatoria
+        for i in range(1, 4):  # Modificar según la clase de IP
+            ip_lista[i] = random.randint(1, 254)  # Evitar 0 y 255 para la red y la difusión
 
+        subred_aleatoria = '.'.join(map(str, ip_lista))
+        return subred_aleatoria
 
-    pos = nx.circular_layout(G)
-    nx.draw(G, pos, with_labels=True, font_weight='bold')
-    nx.draw_networkx_labels(G, pos, labels, font_size=8)
-    plt.show()
+    def verificar_y_mostrar_subredes(self):
+        ventana_sedes = tk.Toplevel()
+        ventana_sedes.title("Resumen de Configuraciones de Sedes")
 
-def guardar_subredes(subredes, mascara):
-    with open("posibles_subredes.txt", "w") as file:
-        file.write("Network Address\tUsable Host Range\tBroadcast Address\tMascara:\n")
-        for subred in subredes:
-            usable_host_range = f"{subred.network_address + 1} - {subred.network_address + subred.num_addresses - 2}"
-            file.write(f"{subred.network_address}\t{usable_host_range}\t{subred.network_address + subred.num_addresses - 1}\t/{mascara.prefixlen}\n")
+        fig, ax = plt.subplots()
 
-def mostrar_configuraciones(subredes, mascara):
-  
-    ventana_configuraciones = tk.Tk()
-    ventana_configuraciones.title("Configuraciones de Subredes")
+        for i, sede in enumerate(self.configuraciones_sedes):
+            total_hosts = math.ceil(self.calcular_hosts_totales(sede))
+            mascara = self.calcular_mascara_red(total_hosts)
 
- 
-    txt_configuraciones = scrolledtext.ScrolledText(ventana_configuraciones, width=80, height=20)
-    txt_configuraciones.pack(padx=10, pady=10)
+            if mascara.prefixlen < 6:
+                clase_ip = 'A'
+            elif 16 <= mascara.prefixlen <= 24:
+                clase_ip = 'B'
+            elif 24 < mascara.prefixlen <= 32:
+                clase_ip = 'C'
+            else:
+                
+                clase_ip = None
 
-   
-    txt_configuraciones.insert(tk.INSERT, "Network Address\tUsable Host Range\tBroadcast Address\tMascara:\n")
-    for subred in subredes:
-        usable_host_range = f"{subred.network_address + 1} - {subred.network_address + subred.num_addresses - 2}"
-        txt_configuraciones.insert(tk.INSERT, f"{subred.network_address}\t{usable_host_range}\t{subred.network_address + subred.num_addresses - 1}\t/{mascara.prefixlen}\n")
+            if clase_ip:
+                subred_aleatoria = self.generar_subred_aleatoria(clase_ip)
 
-    ventana_configuraciones.mainloop()
+                red = IPv4Network(f"{subred_aleatoria}/{mascara.prefixlen}", strict=False)
+                rango_hosts = f"{red.network_address + 1} - {red.broadcast_address - 1}"
+                broadcast = red.broadcast_address
+                puerta_enlace = red.network_address + 1
 
-def guardar_configuracion():
-    configuracion.dispositivos_intermediacion = int(dispositivos_intermediacion_entry.get())
-    configuracion.hosts_por_red = int(hosts_por_red_entry.get())
-    configuracion.uso_dispositivos_personales = uso_dispositivos_personales_var.get()
-    configuracion.numero_sedes = int(numero_sedes_entry.get())
-    configuracion.subred_por_sede = subred_por_sede_var.get()
-    configuracion.crecimiento_red = float(crecimiento_red_entry.get())
+                # Crear un marco para cada sede
+                frame_sede = ttk.Frame(ventana_sedes)
+                frame_sede.grid(row=i // 4, column=i % 4, padx=10, pady=5, sticky="W")
 
-   
-    respuestas, mascara = calcular_direccionamiento(configuracion)
+                texto_sede = (
+                    f"Sede {i + 1}\n"
+                    f"Nombre de Sede: {sede.nombre_sede}\n"
+                    f"Cantidad de Hosts: {sede.cantidad_hosts}\n"
+                    f"Los empleados pueden usar dispositivos: {'Sí' if sede.uso_dispositivos_personales else 'No'}\n"
+                )
 
+                if sede.uso_dispositivos_personales:
+                    texto_sede += (
+                        f"Cantidad de Empleados: {sede.cantidad_empleados}\n"
+                    )
+                texto_sede += f"Cantidad de Dispositivos de Intermediación Gestionables: {sede.cantidad_dispositivos_intermediacion}\n"
+                texto_sede += f"Crecimiento a 5 años: {sede.crecimiento_5_anios}%\n"
+                texto_sede += f"Clasificación IP: {sede.clasificacion_ip}\n"
+                texto_sede += f"Número Total de Hosts: {total_hosts}\n"
+                texto_sede += f"Mascara Red: /{mascara.prefixlen}\n"
+                texto_sede += f"Subred Asignada: {subred_aleatoria}\n"
+                texto_sede += f"Rango de Hosts: {rango_hosts}\n"
+                texto_sede += f"Broadcast de la Subred: {broadcast}\n"
+                texto_sede += f"Puerta de Enlace de la Subred: {puerta_enlace}\n\n"
 
-    generar_grafico(respuestas)
+                sede_label = ttk.Label(frame_sede, text=texto_sede, justify="left")
+                sede_label.grid(row=i % 4, column=0, padx=10, pady=5, sticky="W")
 
-    
-    guardar_subredes(respuestas, mascara)
+                # Agregar información a la gráfica circular
+                datos = {
+                    'Nombre Subred': sede.nombre_sede,
+                    'IP Subred': subred_aleatoria,
+                    'Rango Subred': rango_hosts,
+                    'Broadcast': broadcast,
+                    'Mascara': f"/{mascara.prefixlen}",
+                    'Total Hosts': total_hosts
+                }
+                info = '\n'.join([f"{key}: {datos[key]}" for key in datos.keys()])
+                circulo = Circle((i % 4 * 2.5, -i // 4 * 2.5), 0.8, color='#E1E6FA', fill=True, zorder=2)
+                ax.add_patch(circulo)
+                ax.text(i % 4 * 2.5, -i // 4 * 2.5, info, ha='center', va='center', fontsize=8, color='black', zorder=3)
 
-   
-    mostrar_configuraciones(respuestas, mascara)
+            else:
+                messagebox.showwarning("Advertencia", f"No se puede determinar la clase de IP para la Sede {i + 1}")
 
+        ax.set_xlim(-2, 12)
+        ax.set_ylim(-6, 2)
+        ax.set_aspect('equal', adjustable='datalim')
+        ax.axis('off')
 
+        plt.show()
+
+    def guardar_configuracion(self):
+        self.numero_sedes = int(numero_sedes_entry.get())
+        self.subred_por_sede = subred_por_sede_var.get()
+
+        for i in range(self.numero_sedes):
+            sede = ConfiguracionSede()
+            sede.nombre_sede = simpledialog.askstring(f"Sede {i + 1}", f"Ingrese el nombre de la sede {i + 1}:")
+            sede.cantidad_hosts = simpledialog.askinteger(f"Sede {i + 1}", f"Ingrese la cantidad de hosts para {sede.nombre_sede}:")
+            sede.uso_dispositivos_personales = messagebox.askyesno(f"Sede {i + 1}", f"¿Las personas en {sede.nombre_sede} pueden usar dispositivos personales?")
+
+            self.preguntar_empleados(sede, i)
+
+            clasificacion_ip_options = ['A', 'B', 'C']
+            sede.clasificacion_ip = simpledialog.askstring(f"Sede {i + 1}", f"Seleccione la clasificación de IP para {sede.nombre_sede} (A, B, o C):")
+            self.configuraciones_sedes.append(sede)
+
+        if self.subred_por_sede:
+            self.verificar_y_mostrar_subredes()
+
+class ConfiguracionSede:
+    def __init__(self):
+        self.nombre_sede = ""
+        self.cantidad_hosts = 0
+        self.uso_dispositivos_personales = False
+        self.cantidad_empleados = 0
+        self.cantidad_dispositivos_intermediacion = 0
+        self.crecimiento_5_anios = 0
+        self.clasificacion_ip = ""
+
+# Ventana principal
 ventana = tk.Tk()
 ventana.title("Configuración de Red")
 
+numero_sedes_label = ttk.Label(ventana, text="¿Cuántas sedes tiene la empresa?:")
+numero_sedes_label.grid(row=0, column=0, padx=10, pady=5, sticky="E")
+
+numero_sedes_entry = ttk.Entry(ventana)
+numero_sedes_entry.grid(row=0, column=1, padx=10, pady=5)
+
+subred_por_sede_var = tk.BooleanVar()
+subred_por_sede_checkbox = ttk.Checkbutton(ventana, text="¿Quiere que cada sede tenga una subred distinta?", variable=subred_por_sede_var)
+subred_por_sede_checkbox.grid(row=1, column=0, columnspan=2, pady=5)
 
 configuracion = ConfiguracionRed()
 
-
-dispositivos_intermediacion_label = ttk.Label(ventana, text="¿Cuántos dispositivos de intermediación utilizará?: ")
-dispositivos_intermediacion_entry = ttk.Entry(ventana)
-
-hosts_por_red_label = ttk.Label(ventana, text="¿Cuál es la cantidad de hosts que desea conectar a la red?: ")
-hosts_por_red_entry = ttk.Entry(ventana)
-
-uso_dispositivos_personales_label = ttk.Label(ventana, text="¿Los trabajadores pueden usar los dispositivos personales?: ")
-uso_dispositivos_personales_var = tk.BooleanVar()
-uso_dispositivos_personales_checkbox = ttk.Checkbutton(ventana, variable=uso_dispositivos_personales_var)
-
-numero_sedes_label = ttk.Label(ventana, text="¿Cuántas sedes de la empresa tiene?: ")
-numero_sedes_entry = ttk.Entry(ventana)
-
-subred_por_sede_label = ttk.Label(ventana, text="¿Quiere que cada sede tenga una subred distinta?: ")
-subred_por_sede_var = tk.BooleanVar()
-subred_por_sede_checkbox = ttk.Checkbutton(ventana, variable=subred_por_sede_var)
-
-crecimiento_red_label = ttk.Label(ventana, text="¿En un lapso de 5 años, cuál es el porcentaje de crecimiento para la red? (%):")
-crecimiento_red_entry = ttk.Entry(ventana)
-
-dispositivos_intermediacion_label.grid(row=2, column=0, padx=10, pady=5, sticky="E")
-dispositivos_intermediacion_entry.grid(row=2, column=1, padx=10, pady=5)
-
-hosts_por_red_label.grid(row=3, column=0, padx=10, pady=5, sticky="E")
-hosts_por_red_entry.grid(row=3, column=1, padx=10, pady=5)
-
-uso_dispositivos_personales_label.grid(row=4, column=0, padx=10, pady=5, sticky="E")
-uso_dispositivos_personales_checkbox.grid(row=4, column=1, padx=10, pady=5, sticky="W")
-
-numero_sedes_label.grid(row=5, column=0, padx=10, pady=5, sticky="E")
-numero_sedes_entry.grid(row=5, column=1, padx=10, pady=5)
-
-subred_por_sede_label.grid(row=6, column=0, padx=10, pady=5, sticky="E")
-subred_por_sede_checkbox.grid(row=6, column=1, padx=10, pady=5, sticky="W")
-
-crecimiento_red_label.grid(row=7, column=0, padx=10, pady=5, sticky="E")
-crecimiento_red_entry.grid(row=7, column=1, padx=10, pady=5)
-
-
-guardar_boton = ttk.Button(ventana, text="Guardar Configuración", command=guardar_configuracion)
-guardar_boton.grid(row=8, column=0, columnspan=2, pady=10)
-
+guardar_boton = ttk.Button(ventana, text="Guardar Configuración", command=configuracion.guardar_configuracion)
+guardar_boton.grid(row=2, column=0, columnspan=2, pady=10)
 
 ventana.mainloop()
