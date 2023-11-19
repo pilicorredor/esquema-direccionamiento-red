@@ -20,7 +20,6 @@ class ConfiguracionRed:
         while 2 ** bits_necesarios - 2 < total_hosts:
             bits_necesarios += 1
 
-        # Calcular la máscara de subred
         mascara_subred = 32 - bits_necesarios
         mascara = IPv4Network(f"0.0.0.0/{mascara_subred}", strict=False)
         return mascara
@@ -38,7 +37,10 @@ class ConfiguracionRed:
         else:
             return sede.cantidad_hosts + (sede.cantidad_hosts * sede.crecimiento_5_anios / 100) + sede.cantidad_dispositivos_intermediacion
 
-    def generar_subred_aleatoria(self, clase):
+    def generar_subred_personalizada(self, sede):
+        ip_base = None
+        clase = sede.clasificacion_ip
+
         if clase == 'A':
             ip_base = self.ipclasea
         elif clase == 'B':
@@ -46,18 +48,15 @@ class ConfiguracionRed:
         elif clase == 'C':
             ip_base = self.ipclaseac
         else:
-            # Tratar otro caso si es necesario
             return None
 
-        # Convertir la IP base a una lista de números
         ip_lista = list(map(int, ip_base.split('.')))
 
-        # Generar una subred aleatoria
-        for i in range(1, 4):  # Modificar según la clase de IP
-            ip_lista[i] = random.randint(1, 254)  # Evitar 0 y 255 para la red y la difusión
+        for i in range(1, 4):
+            ip_lista[i] = random.randint(1, 254)
 
-        subred_aleatoria = '.'.join(map(str, ip_lista))
-        return subred_aleatoria
+        subred_personalizada = '.'.join(map(str, ip_lista))
+        return subred_personalizada
 
     def verificar_y_mostrar_subredes(self):
         ventana_sedes = tk.Toplevel()
@@ -69,68 +68,55 @@ class ConfiguracionRed:
             total_hosts = math.ceil(self.calcular_hosts_totales(sede))
             mascara = self.calcular_mascara_red(total_hosts)
 
-            if mascara.prefixlen < 6:
-                clase_ip = 'A'
-            elif 16 <= mascara.prefixlen <= 24:
-                clase_ip = 'B'
-            elif 24 < mascara.prefixlen <= 32:
-                clase_ip = 'C'
-            else:
-                
-                clase_ip = None
+            subred_personalizada = self.generar_subred_personalizada(sede)
+            if not subred_personalizada:
+                messagebox.showwarning("Advertencia", f"No se pudo generar la subred para la Sede {i + 1}")
+                continue
 
-            if clase_ip:
-                subred_aleatoria = self.generar_subred_aleatoria(clase_ip)
+            red = IPv4Network(f"{subred_personalizada}/{mascara.prefixlen}", strict=False)
+            rango_hosts = f"{red.network_address + 1} - {red.broadcast_address - 1}"
+            broadcast = red.broadcast_address
+            puerta_enlace = red.network_address + 1
 
-                red = IPv4Network(f"{subred_aleatoria}/{mascara.prefixlen}", strict=False)
-                rango_hosts = f"{red.network_address + 1} - {red.broadcast_address - 1}"
-                broadcast = red.broadcast_address
-                puerta_enlace = red.network_address + 1
+            frame_sede = ttk.Frame(ventana_sedes)
+            frame_sede.grid(row=i // 4, column=i % 4, padx=10, pady=5, sticky="W")
 
-                # Crear un marco para cada sede
-                frame_sede = ttk.Frame(ventana_sedes)
-                frame_sede.grid(row=i // 4, column=i % 4, padx=10, pady=5, sticky="W")
+            texto_sede = (
+                f"Sede {i + 1}\n"
+                f"Nombre de Sede: {sede.nombre_sede}\n"
+                f"Cantidad de Hosts: {sede.cantidad_hosts}\n"
+                f"Los empleados pueden usar dispositivos: {'Sí' if sede.uso_dispositivos_personales else 'No'}\n"
+            )
 
-                texto_sede = (
-                    f"Sede {i + 1}\n"
-                    f"Nombre de Sede: {sede.nombre_sede}\n"
-                    f"Cantidad de Hosts: {sede.cantidad_hosts}\n"
-                    f"Los empleados pueden usar dispositivos: {'Sí' if sede.uso_dispositivos_personales else 'No'}\n"
+            if sede.uso_dispositivos_personales:
+                texto_sede += (
+                    f"Cantidad de Empleados: {sede.cantidad_empleados}\n"
                 )
+            texto_sede += f"Cantidad de Dispositivos de Intermediación Gestionables: {sede.cantidad_dispositivos_intermediacion}\n"
+            texto_sede += f"Crecimiento a 5 años: {sede.crecimiento_5_anios}%\n"
+            texto_sede += f"Clasificación IP: {sede.clasificacion_ip}\n"
+            texto_sede += f"Número Total de Hosts: {total_hosts}\n"
+            texto_sede += f"Mascara Red: /{mascara.prefixlen}\n"
+            texto_sede += f"Subred Asignada: {subred_personalizada}\n"
+            texto_sede += f"Rango de Hosts: {rango_hosts}\n"
+            texto_sede += f"Broadcast de la Subred: {broadcast}\n"
+            texto_sede += f"Puerta de Enlace de la Subred: {puerta_enlace}\n\n"
 
-                if sede.uso_dispositivos_personales:
-                    texto_sede += (
-                        f"Cantidad de Empleados: {sede.cantidad_empleados}\n"
-                    )
-                texto_sede += f"Cantidad de Dispositivos de Intermediación Gestionables: {sede.cantidad_dispositivos_intermediacion}\n"
-                texto_sede += f"Crecimiento a 5 años: {sede.crecimiento_5_anios}%\n"
-                texto_sede += f"Clasificación IP: {sede.clasificacion_ip}\n"
-                texto_sede += f"Número Total de Hosts: {total_hosts}\n"
-                texto_sede += f"Mascara Red: /{mascara.prefixlen}\n"
-                texto_sede += f"Subred Asignada: {subred_aleatoria}\n"
-                texto_sede += f"Rango de Hosts: {rango_hosts}\n"
-                texto_sede += f"Broadcast de la Subred: {broadcast}\n"
-                texto_sede += f"Puerta de Enlace de la Subred: {puerta_enlace}\n\n"
+            sede_label = ttk.Label(frame_sede, text=texto_sede, justify="left")
+            sede_label.grid(row=i % 4, column=0, padx=10, pady=5, sticky="W")
 
-                sede_label = ttk.Label(frame_sede, text=texto_sede, justify="left")
-                sede_label.grid(row=i % 4, column=0, padx=10, pady=5, sticky="W")
-
-                # Agregar información a la gráfica circular
-                datos = {
-                    'Nombre Subred': sede.nombre_sede,
-                    'IP Subred': subred_aleatoria,
-                    'Rango Subred': rango_hosts,
-                    'Broadcast': broadcast,
-                    'Mascara': f"/{mascara.prefixlen}",
-                    'Total Hosts': total_hosts
-                }
-                info = '\n'.join([f"{key}: {datos[key]}" for key in datos.keys()])
-                circulo = Circle((i % 4 * 2.5, -i // 4 * 2.5), 0.8, color='#E1E6FA', fill=True, zorder=2)
-                ax.add_patch(circulo)
-                ax.text(i % 4 * 2.5, -i // 4 * 2.5, info, ha='center', va='center', fontsize=8, color='black', zorder=3)
-
-            else:
-                messagebox.showwarning("Advertencia", f"No se puede determinar la clase de IP para la Sede {i + 1}")
+            datos = {
+                'Nombre Subred': sede.nombre_sede,
+                'IP Subred': subred_personalizada,
+                'Rango Subred': rango_hosts,
+                'Broadcast': broadcast,
+                'Mascara': f"/{mascara.prefixlen}",
+                'Total Hosts': total_hosts
+            }
+            info = '\n'.join([f"{key}: {datos[key]}" for key in datos.keys()])
+            circulo = Circle((i % 4 * 2.5, -i // 4 * 2.5), 0.8, color='#E1E6FA', fill=True, zorder=2)
+            ax.add_patch(circulo)
+            ax.text(i % 4 * 2.5, -i // 4 * 2.5, info, ha='center', va='center', fontsize=8, color='black', zorder=3)
 
         ax.set_xlim(-2, 12)
         ax.set_ylim(-6, 2)
@@ -151,7 +137,6 @@ class ConfiguracionRed:
 
             self.preguntar_empleados(sede, i)
 
-            clasificacion_ip_options = ['A', 'B', 'C']
             sede.clasificacion_ip = simpledialog.askstring(f"Sede {i + 1}", f"Seleccione la clasificación de IP para {sede.nombre_sede} (A, B, o C):")
             self.configuraciones_sedes.append(sede)
 
@@ -168,7 +153,6 @@ class ConfiguracionSede:
         self.crecimiento_5_anios = 0
         self.clasificacion_ip = ""
 
-# Ventana principal
 ventana = tk.Tk()
 ventana.title("Configuración de Red")
 
