@@ -9,7 +9,7 @@ from matplotlib.patches import Circle
 class ConfiguracionRed:
     def __init__(self):
         self.numero_sedes = 0
-        self.subred_por_sede = False
+        self.subred_por_sede = True
         self.configuraciones_sedes = []
         self.ipclasea = "10.4.1.0"
         self.ipclaseb = "144.168.1.0"
@@ -32,11 +32,13 @@ class ConfiguracionRed:
         sede.crecimiento_5_anios = simpledialog.askfloat(f"Sede {indice + 1}", f"Crecimiento a 5 años en {sede.nombre_sede} (%):")
 
     def calcular_hosts_totales(self, sede):
-        if sede.uso_dispositivos_personales:
-            return sede.cantidad_hosts + (sede.cantidad_hosts * sede.crecimiento_5_anios / 100) + sede.cantidad_dispositivos_intermediacion + sede.cantidad_empleados
-        else:
-            return sede.cantidad_hosts + (sede.cantidad_hosts * sede.crecimiento_5_anios / 100) + sede.cantidad_dispositivos_intermediacion
+        cantidad_base = sede.cantidad_hosts + sede.cantidad_dispositivos_intermediacion
 
+        if sede.uso_dispositivos_personales:
+            cantidad_base += sede.cantidad_empleados
+
+        return cantidad_base * ( 1+sede.crecimiento_5_anios / 100)
+    
     def generar_subred_personalizada(self, sede):
         ip_base = None
         clase = sede.clasificacion_ip
@@ -127,7 +129,7 @@ class ConfiguracionRed:
 
     def guardar_configuracion(self):
         self.numero_sedes = int(numero_sedes_entry.get())
-        self.subred_por_sede = subred_por_sede_var.get()
+        self.subred_por_sede = self.subred_por_sede
 
         for i in range(self.numero_sedes):
             sede = ConfiguracionSede()
@@ -162,9 +164,6 @@ numero_sedes_label.grid(row=0, column=0, padx=10, pady=5, sticky="E")
 numero_sedes_entry = ttk.Entry(ventana)
 numero_sedes_entry.grid(row=0, column=1, padx=10, pady=5)
 
-subred_por_sede_var = tk.BooleanVar()
-subred_por_sede_checkbox = ttk.Checkbutton(ventana, text="¿Quiere que cada sede tenga una subred distinta?", variable=subred_por_sede_var)
-subred_por_sede_checkbox.grid(row=1, column=0, columnspan=2, pady=5)
 
 configuracion = ConfiguracionRed()
 
