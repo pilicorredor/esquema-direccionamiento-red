@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, simpledialog, messagebox
-from ipaddress import IPv4Network
+from ipaddress import IPv4Network, IPv4Address
 import random
 import math
 import matplotlib.pyplot as plt
@@ -14,6 +14,7 @@ class ConfiguracionRed:
         self.ipclasea = "10.4.1.0"
         self.ipclaseb = "144.168.1.0"
         self.ipclaseac = "192.168.1.0"
+       
 
     def calcular_mascara_red(self, total_hosts):
         bits_necesarios = 0
@@ -78,6 +79,9 @@ class ConfiguracionRed:
             red = IPv4Network(f"{subred_personalizada}/{mascara.prefixlen}", strict=False)
             rango_hosts = f"{red.network_address + 1} - {red.broadcast_address - 1}"
             broadcast = red.broadcast_address
+            sub= red.network_address
+            th= red.num_addresses-2
+            
             puerta_enlace = red.network_address + 1
 
             frame_sede = ttk.Frame(ventana_sedes)
@@ -97,9 +101,9 @@ class ConfiguracionRed:
             texto_sede += f"Cantidad de Dispositivos de Intermediación Gestionables: {sede.cantidad_dispositivos_intermediacion}\n"
             texto_sede += f"Crecimiento a 5 años: {sede.crecimiento_5_anios}%\n"
             texto_sede += f"Clasificación IP: {sede.clasificacion_ip}\n"
-            texto_sede += f"Número Total de Hosts: {total_hosts}\n"
+            texto_sede += f"Número Total de Hosts de la red: {total_hosts}\n"
             texto_sede += f"Mascara Red: /{mascara.prefixlen}\n"
-            texto_sede += f"Subred Asignada: {subred_personalizada}\n"
+            texto_sede += f"Subred Asignada: {sub}\n"
             texto_sede += f"Rango de Hosts: {rango_hosts}\n"
             texto_sede += f"Broadcast de la Subred: {broadcast}\n"
             texto_sede += f"Puerta de Enlace de la Subred: {puerta_enlace}\n\n"
@@ -109,11 +113,12 @@ class ConfiguracionRed:
 
             datos = {
                 'Nombre Subred': sede.nombre_sede,
-                'IP Subred': subred_personalizada,
+                'IP Subred': sub,
                 'Rango Subred': rango_hosts,
                 'Broadcast': broadcast,
                 'Mascara': f"/{mascara.prefixlen}",
-                'Total Hosts': total_hosts
+                'Total ip usables': th,
+                'Total hosts red': total_hosts
             }
             info = '\n'.join([f"{key}: {datos[key]}" for key in datos.keys()])
             circulo = Circle((i % 4 * 2.5, -i // 4 * 2.5), 0.8, color='#E1E6FA', fill=True, zorder=2)
